@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -15,6 +17,13 @@ from mcpgen.services.chat_service import ChatService
 from mcpgen.services.generation_service import GeneratedServerNotFoundError, GenerationService
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+
+
+def _serialize_event_data(kind: str, data: Any) -> Any:
+    """Sérialise les événements pour le flux SSE (ToolCallInfo -> dict JSON)."""
+    if kind == "tool_calls" and isinstance(data, list):
+        return [asdict(item) for item in data]
+    return data
 
 
 @router.get("/providers", response_model=list[ChatProvider])
@@ -42,7 +51,11 @@ async def chat_stream(
         yield "event: start\ndata: {}\n\n"
         try:
             async for event in service.stream_chat(server, payload):
-                data = json.dumps(event.data, ensure_ascii=False, default=str)
+                data = json.dumps(
+                    _serialize_event_data(event.kind, event.data),
+                    ensure_ascii=False,
+                    default=str,
+                )
                 yield f"event: {event.kind}\ndata: {data}\n\n"
                 if event.kind == "error":
                     yield 'event: done\ndata: {"error": true}\n\n'
