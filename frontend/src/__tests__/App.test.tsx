@@ -22,7 +22,7 @@ describe('App', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText(/MCP Generator/)).toBeInTheDocument();
+    expect(screen.getAllByText(/MCP Generator/).length).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: 'Générer' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Serveurs' })).toBeInTheDocument();
     expect(screen.getByText('Importer une spec Swagger/OpenAPI')).toBeInTheDocument();

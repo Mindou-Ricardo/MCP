@@ -29,12 +29,24 @@ export function PlaygroundPage() {
   if (error) {
     return (
       <div className="mx-auto max-w-3xl p-6">
-        <div className="card text-sm text-red-600">{error}</div>
+        <div className="card space-y-3 text-sm text-red-600">
+          <p>{error}</p>
+          <button type="button" className="btn-secondary" onClick={() => navigate('/servers')}>
+            ← Retour aux serveurs
+          </button>
+        </div>
       </div>
     );
   }
   if (!server) {
-    return <div className="p-6 text-center text-sm text-slate-400">Chargement du serveur…</div>;
+    return (
+      <div className="mx-auto max-w-5xl space-y-4 p-6">
+        <div className="card space-y-3">
+          <div className="skeleton h-5 w-48" />
+          <div className="skeleton h-72" />
+        </div>
+      </div>
+    );
   }
   if (server.status !== 'ready') {
     return <Navigate to="/servers" replace />;

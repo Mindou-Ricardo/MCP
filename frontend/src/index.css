@@ -3,24 +3,33 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-50 text-slate-800 antialiased;
+  @apply bg-slate-100 text-slate-800 antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid theme('colors.blue.500');
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .btn {
-  @apply inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none active:scale-[0.98];
 }
 .btn-primary {
-  @apply btn bg-blue-600 text-white hover:bg-blue-700;
+  @apply btn bg-blue-600 text-white hover:bg-blue-700 hover:shadow;
 }
 .btn-secondary {
-  @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-100;
+  @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-400;
 }
 .btn-danger {
-  @apply btn border border-red-200 bg-white text-red-600 hover:bg-red-50;
+  @apply btn border border-red-200 bg-white text-red-600 hover:bg-red-50 hover:border-red-300;
+}
+.btn-ghost {
+  @apply btn border border-transparent bg-transparent text-slate-500 shadow-none hover:bg-slate-100 hover:text-slate-700;
 }
 
 .input {
-  @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200;
+  @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition-colors placeholder:text-slate-400 focus:border-blue-500;
 }
 
 .label {
@@ -29,4 +38,36 @@ body {
 
 .card {
   @apply rounded-xl border border-slate-200 bg-white p-5 shadow-sm;
+}
+
+.spinner {
+  @apply inline-block size-4 animate-spin rounded-full border-2 border-current border-t-transparent;
+}
+
+.skeleton {
+  @apply animate-pulse rounded-md bg-slate-200;
+}
+
+.chip {
+  @apply inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-blue-300 hover:text-blue-700;
+}
+
+.badge {
+  @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+}
+
+/* Scrollbar discrète pour les zones denses (table, chat) */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: theme('colors.slate.300') transparent;
+}
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-slate-300;
+}
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
 }

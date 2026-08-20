@@ -63,6 +63,10 @@ describe('EndpointsTable', () => {
         onSelectAll={vi.fn()}
       />,
     );
-    expect(screen.getByText('1 / 3 endpoints sélectionnés')).toBeInTheDocument();
+    expect(
+      screen.getAllByText(
+        (_, node) => node !== null && node.textContent === '1 / 3 endpoints sélectionnés',
+      ).length,
+    ).toBeGreaterThan(0);
   });
 });

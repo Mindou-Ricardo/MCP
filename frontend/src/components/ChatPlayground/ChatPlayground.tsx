@@ -18,6 +18,13 @@ interface ChatEntry {
   streaming?: boolean;
 }
 
+const SUGGESTIONS = [
+  'Quels tools sont disponibles ?',
+  'Présente-toi en une phrase.',
+  'Utilise un tool puis explique le résultat.',
+  'Une requête simple via le tool principal.',
+];
+
 function newId(): string {
   return typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
@@ -30,22 +37,25 @@ export function ChatPlayground({ server, onBack }: ChatPlaygroundProps) {
   const [providers, setProviders] = useState<ChatProvider[]>([]);
   const [model, setModel] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const greeting = useCallback(
+    (): ChatEntry => ({
+      id: newId(),
+      role: 'system',
+      content: `Serveur MCP « ${server.name} » prêt : ${server.endpoints_count} tool(s) disponibles.`,
+    }),
+    [server.name, server.endpoints_count],
+  );
 
   useEffect(() => {
     void api
       .listProviders()
       .then(setProviders)
-      .catch(() => setError('Providers indisponibles'));
-    const greeting: ChatEntry = {
-      id: newId(),
-      role: 'system',
-      content: `Serveur MCP « ${server.name} » prêt : ${server.endpoints_count} tool(s) disponibles.`,
-    };
-    setEntries([greeting]);
-  }, [server.id, server.name, server.endpoints_count]);
+      .catch(() => undefined);
+    setEntries([greeting()]);
+  }, [greeting]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ behavior: 'smooth' });
@@ -83,6 +93,12 @@ export function ChatPlayground({ server, onBack }: ChatPlaygroundProps) {
     [],
   );
 
+  function resetConversation() {
+    if (busy) return;
+    setEntries([greeting()]);
+    setInput('');
+  }
+
   async function handleSend() {
     const text = input.trim();
     if (!text || busy) return;
@@ -90,7 +106,6 @@ export function ChatPlayground({ server, onBack }: ChatPlaygroundProps) {
     setEntries((prev) => [...prev, userEntry]);
     setInput('');
     setBusy(true);
-    setError(null);
 
     const assistantEntry: ChatEntry = {
       id: newId(),
@@ -133,7 +148,6 @@ export function ChatPlayground({ server, onBack }: ChatPlaygroundProps) {
                   toolName: call.name,
                   content: '',
                   toolResult: '',
-                  toolCalls: undefined,
                 },
               ]);
             }
@@ -152,19 +166,26 @@ export function ChatPlayground({ server, onBack }: ChatPlaygroundProps) {
               prev.map((e) => (e.id === assistantEntry.id ? { ...e, streaming: false } : e)),
             );
           },
-          onError: (message) => setError(message),
+          onError: (message) => {
+            setEntries((prev) => [
+              ...prev.map((e) => (e.id === assistantEntry.id ? { ...e, streaming: false } : e)),
+              { id: newId(), role: 'error', content: message },
+            ]);
+          },
         },
         abortRef.current.signal,
       );
     } catch (err) {
-      if ((err as Error).name === 'AbortError') {
-        setError('Génération interrompue.');
-      } else {
-        setError(err instanceof Error ? err.message : 'Erreur de chat');
-      }
-      setEntries((prev) =>
-        prev.map((e) => (e.id === assistantEntry.id ? { ...e, streaming: false } : e)),
-      );
+      const message =
+        (err as Error).name === 'AbortError'
+          ? 'Génération interrompue.'
+          : err instanceof Error
+            ? err.message
+            : 'Erreur de chat';
+      setEntries((prev) => [
+        ...prev.map((e) => (e.id === assistantEntry.id ? { ...e, streaming: false } : e)),
+        { id: newId(), role: 'error', content: message },
+      ]);
     } finally {
       setBusy(false);
       abortRef.current = null;
@@ -175,9 +196,11 @@ export function ChatPlayground({ server, onBack }: ChatPlaygroundProps) {
     abortRef.current?.abort();
   }
 
+  const emptyThread = entries.filter((e) => e.role === 'system').length === entries.length;
+
   return (
-    <section className="flex h-[70vh] flex-col space-y-3">
-      <div className="card flex items-center justify-between">
+    <section className="flex h-[72vh] flex-col space-y-3">
+      <div className="card flex flex-wrap items-center justify-between gap-3">
         <div>
           <button
             type="button"
@@ -186,15 +209,15 @@ export function ChatPlayground({ server, onBack }: ChatPlaygroundProps) {
           >
             ← Retour aux serveurs
           </button>
-          <h2 className="text-lg font-semibold">Playground — {server.name}</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Playground — {server.name}</h2>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <label className="label mb-0" htmlFor="model-select">
             Modèle
           </label>
           <select
             id="model-select"
-            className="input w-72"
+            className="input w-56"
             value={model}
             data-testid="model-select"
             onChange={(e) => setModel(e.target.value)}
@@ -210,49 +233,87 @@ export function ChatPlayground({ server, onBack }: ChatPlaygroundProps) {
               </optgroup>
             ))}
           </select>
+          {entries.length > 1 && (
+            <button
+              type="button"
+              className="btn-ghost"
+              disabled={busy}
+              title="Effacer la conversation"
+              onClick={resetConversation}
+            >
+              Nouvelle conversation
+            </button>
+          )}
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-
-      <div className="card flex-1 space-y-3 overflow-y-auto">
+      <div className="card scroll-thin flex-1 space-y-3 overflow-y-auto">
+        {emptyThread && (
+          <div className="flex flex-col items-center gap-4 py-10">
+            <p className="max-w-md text-center text-sm leading-relaxed text-slate-400">
+              Discutez avec votre serveur MCP : le modèle peut invoquer les tools générés qui
+              appellent l'API « {server.name} » en temps réel.
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {SUGGESTIONS.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  className="chip"
+                  disabled={busy}
+                  onClick={() => {
+                    setInput(suggestion);
+                  }}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {entries.map((entry) => (
           <MessageBubble key={entry.id} entry={entry} />
         ))}
         <div ref={bottomRef} />
       </div>
 
-      <div className="card flex items-center gap-2 !py-2">
-        <textarea
-          className="input flex-1 resize-none"
-          rows={1}
-          placeholder="Demandez à l'API quelque chose (ex : « liste les animaux »)…"
-          value={input}
-          disabled={busy}
-          data-testid="chat-input"
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              void handleSend();
-            }
-          }}
-        />
-        {busy ? (
-          <button type="button" className="btn-danger" onClick={handleStop}>
-            Arrêter
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={!input.trim()}
-            data-testid="send-button"
-            onClick={() => void handleSend()}
-          >
-            Envoyer
-          </button>
-        )}
+      <div className="card flex flex-col gap-1.5 !py-2.5">
+        <div className="flex items-center gap-2">
+          <textarea
+            className="input flex-1 resize-none"
+            rows={1}
+            placeholder="Demandez à l'API quelque chose (ex : « liste les animaux »)…"
+            value={input}
+            disabled={busy}
+            data-testid="chat-input"
+            aria-label="Message"
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                void handleSend();
+              }
+            }}
+          />
+          {busy ? (
+            <button type="button" className="btn-danger" onClick={handleStop}>
+              Arrêter
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={!input.trim()}
+              data-testid="send-button"
+              onClick={() => void handleSend()}
+            >
+              Envoyer
+            </button>
+          )}
+        </div>
+        <p className="text-right text-[10px] text-slate-400">
+          Entrée pour envoyer · Maj+Entrée pour une nouvelle ligne
+        </p>
       </div>
     </section>
   );
@@ -272,15 +333,44 @@ function formatToolResult(raw: string): string {
   }
 }
 
+function toolResultMeta(raw: string): { statusCode: number | null; error: boolean } {
+  try {
+    const parsed = JSON.parse(raw) as { status_code?: number; error?: string };
+    return { statusCode: parsed.status_code ?? null, error: Boolean(parsed.error) };
+  } catch {
+    return { statusCode: null, error: false };
+  }
+}
+
 function MessageBubble({ entry }: { entry: ChatEntry }) {
   if (entry.role === 'system') {
     return <p className="text-center text-xs text-slate-400">{entry.content}</p>;
   }
+  if (entry.role === 'error') {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+        {entry.content}
+      </div>
+    );
+  }
   if (entry.role === 'tool') {
+    const meta = toolResultMeta(entry.toolResult ?? '');
     return (
       <div className="rounded-lg border border-violet-100 bg-violet-50/60 px-3 py-2">
-        <p className="text-xs font-semibold text-violet-700">
-          🛠 {entry.toolName} — résultat de l&apos;API
+        <p className="flex items-center gap-2 text-xs font-semibold text-violet-700">
+          🛠 {entry.toolName}
+          {meta.statusCode !== null && (
+            <span
+              className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                meta.error || meta.statusCode >= 400
+                  ? 'bg-red-100 text-red-600'
+                  : 'bg-violet-100 text-violet-600'
+              }`}
+            >
+              {meta.statusCode}
+            </span>
+          )}
+          <span className="text-[10px] font-normal text-violet-400">résultat de l&apos;API</span>
         </p>
         <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap font-mono text-xs text-slate-600">
           {entry.toolResult ?? entry.content}

@@ -32,7 +32,15 @@ export function ServerConfigForm({
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = name.trim().length >= 2 && (baseUrl.trim() || spec.base_url);
+  const canSubmit = name.trim().length >= 2 && (baseUrl.trim() || spec.base_url) && !busy;
+
+  const disabledReason = !name.trim()
+    ? 'Indiquez un nom de serveur (2 caractères minimum)'
+    : name.trim().length < 2
+      ? 'Le nom du serveur doit contenir au moins 2 caractères'
+      : !baseUrl.trim() && !spec.base_url
+        ? "Indiquez l'URL cible (aucune trouvée dans la spec)"
+        : null;
 
   async function handleSubmit() {
     setError(null);
@@ -60,9 +68,14 @@ export function ServerConfigForm({
 
   return (
     <section className="card space-y-4">
-      <h2 className="text-lg font-semibold">Configurer le serveur MCP</h2>
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-lg font-semibold text-slate-900">Configurer le serveur MCP</h2>
+        <span className="badge border border-slate-200 bg-slate-50 text-slate-600">
+          {selectedEndpoints.length} endpoint{selectedEndpoints.length > 1 ? 's' : ''}
+        </span>
+      </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label className="label" htmlFor="server-name">
             Nom du serveur
@@ -104,7 +117,7 @@ export function ServerConfigForm({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label className="label" htmlFor="auth-type">
             Authentification
@@ -124,35 +137,42 @@ export function ServerConfigForm({
           </select>
         </div>
         {authType === 'api_key' && (
-          <>
-            <div>
-              <label className="label" htmlFor="auth-header">
-                Header
-              </label>
-              <input
-                id="auth-header"
-                className="input"
-                value={headerName}
-                onChange={(e) => setHeaderName(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="label" htmlFor="auth-key">
-                Clé API
-              </label>
-              <input
-                id="auth-key"
-                className="input"
-                type="password"
-                value={apiKey}
-                data-testid="auth-key"
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-            </div>
-          </>
-        )}
-        {authType === 'bearer' && (
           <div>
+            <label className="label" htmlFor="auth-header">
+              Nom du header
+            </label>
+            <input
+              id="auth-header"
+              className="input"
+              value={headerName}
+              placeholder="X-API-Key"
+              onChange={(e) => setHeaderName(e.target.value)}
+            />
+          </div>
+        )}
+      </div>
+
+      {authType === 'api_key' && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="md:col-start-2">
+            <label className="label" htmlFor="auth-key">
+              Clé API
+            </label>
+            <input
+              id="auth-key"
+              className="input"
+              type="password"
+              autoComplete="off"
+              value={apiKey}
+              data-testid="auth-key"
+              onChange={(e) => setApiKey(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+      {authType === 'bearer' && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="md:col-start-2">
             <label className="label" htmlFor="auth-bearer">
               Token
             </label>
@@ -160,54 +180,68 @@ export function ServerConfigForm({
               id="auth-bearer"
               className="input"
               type="password"
+              autoComplete="off"
               value={apiKey}
               data-testid="auth-key"
+              placeholder="Bearer …"
               onChange={(e) => setApiKey(e.target.value)}
             />
           </div>
-        )}
-        {authType === 'basic' && (
-          <>
-            <div>
-              <label className="label" htmlFor="auth-user">
-                Utilisateur
-              </label>
-              <input
-                id="auth-user"
-                className="input"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="label" htmlFor="auth-pass">
-                Mot de passe
-              </label>
-              <input
-                id="auth-pass"
-                className="input"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-          </>
-        )}
-      </div>
+        </div>
+      )}
+      {authType === 'basic' && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label className="label" htmlFor="auth-user">
+              Utilisateur
+            </label>
+            <input
+              id="auth-user"
+              className="input"
+              autoComplete="off"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="auth-pass">
+              Mot de passe
+            </label>
+            <input
+              id="auth-pass"
+              className="input"
+              type="password"
+              autoComplete="off"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-100 pt-4 sm:flex-row">
         <p className="text-xs text-slate-400">
           Spec : <span className="font-semibold">{spec.filename}</span> — {selectedEndpoints.length}{' '}
-          endpoint(s) inclus
+          endpoint{selectedEndpoints.length > 1 ? 's' : ''} inclus
+          {selectedEndpoints.length === 0 && (
+            <span className="ml-1 text-amber-600">(sélectionnez au moins un endpoint)</span>
+          )}
         </p>
         <button
           type="button"
-          className="btn-primary"
-          disabled={!canSubmit || busy}
-          onClick={handleSubmit}
+          className="btn-primary min-w-56"
+          disabled={!canSubmit}
+          title={disabledReason ?? undefined}
+          onClick={() => void handleSubmit()}
           data-testid="generate-button"
         >
-          {busy ? 'Génération en cours…' : 'Générer le serveur MCP'}
+          {busy ? (
+            <>
+              <span className="spinner" /> Génération en cours…
+            </>
+          ) : (
+            'Générer le serveur MCP'
+          )}
         </button>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}

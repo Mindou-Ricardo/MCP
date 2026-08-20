@@ -19,6 +19,8 @@ const METHOD_COLORS: Record<string, string> = {
   OPTIONS: 'bg-slate-100 text-slate-600',
 };
 
+const ALL_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+
 export function EndpointsTable({
   endpoints,
   selected,
@@ -26,44 +28,63 @@ export function EndpointsTable({
   onSelectAll,
 }: EndpointsTableProps) {
   const [query, setQuery] = useState('');
+  const [method, setMethod] = useState('ALL');
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return endpoints;
     return endpoints.filter(
       (e) =>
-        e.name.toLowerCase().includes(q) ||
-        e.path.toLowerCase().includes(q) ||
-        e.method.toLowerCase().includes(q),
+        (method === 'ALL' || e.method === method) &&
+        (!q ||
+          e.name.toLowerCase().includes(q) ||
+          e.path.toLowerCase().includes(q) ||
+          e.method.toLowerCase().includes(q)),
     );
-  }, [endpoints, query]);
+  }, [endpoints, query, method]);
+
+  const allSelected = selected.size === endpoints.length;
+  const visibleSelected = filtered.filter((e) => selected.has(e.name)).length;
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <input
-          className="input max-w-xs"
-          placeholder="Filtrer (nom, chemin, méthode)…"
-          value={query}
-          data-testid="filter-input"
-          onChange={(e) => setQuery(e.target.value)}
-        />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-1 flex-wrap items-center gap-2">
+          <input
+            className="input max-w-xs"
+            placeholder="Filtrer (nom, chemin, méthode)…"
+            value={query}
+            data-testid="filter-input"
+            aria-label="Filtrer les endpoints"
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <select
+            className="input w-auto"
+            value={method}
+            aria-label="Filtrer par méthode HTTP"
+            onChange={(e) => setMethod(e.target.value)}
+          >
+            <option value="ALL">Toutes les méthodes</option>
+            {ALL_METHODS.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </div>
         <button
           type="button"
           className="btn-secondary"
-          onClick={() =>
-            onSelectAll(selected.size === endpoints.length ? [] : endpoints.map((e) => e.name))
-          }
+          onClick={() => onSelectAll(allSelected ? [] : endpoints.map((e) => e.name))}
         >
-          {selected.size === endpoints.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+          {allSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
         </button>
       </div>
 
-      <div className="max-h-96 overflow-auto rounded-lg border border-slate-200">
+      <div className="scroll-thin max-h-96 overflow-auto rounded-lg border border-slate-200">
         <table className="w-full text-left text-sm">
-          <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500">
+          <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
-              <th className="px-3 py-2">#</th>
+              <th className="w-10 px-3 py-2">#</th>
               <th className="px-3 py-2">Tool MCP</th>
               <th className="px-3 py-2">Méthode</th>
               <th className="px-3 py-2">Chemin</th>
@@ -74,13 +95,16 @@ export function EndpointsTable({
             {filtered.map((endpoint) => (
               <tr
                 key={endpoint.name}
-                className={selected.has(endpoint.name) ? 'bg-blue-50/50' : ''}
+                className={`transition-colors ${
+                  selected.has(endpoint.name) ? 'bg-blue-50/60' : 'hover:bg-slate-50'
+                }`}
               >
                 <td className="px-3 py-2">
                   <input
                     type="checkbox"
                     aria-label={`Sélectionner ${endpoint.name}`}
                     checked={selected.has(endpoint.name)}
+                    className="size-4 accent-blue-600"
                     onChange={() => onToggle(endpoint.name)}
                   />
                 </td>
@@ -92,7 +116,7 @@ export function EndpointsTable({
                     {endpoint.method}
                   </span>
                 </td>
-                <td className="px-3 py-2 font-mono text-xs">{endpoint.path}</td>
+                <td className="px-3 py-2 font-mono text-xs text-slate-700">{endpoint.path}</td>
                 <td className="max-w-md truncate px-3 py-2 text-xs text-slate-500">
                   {endpoint.summary ?? endpoint.description ?? '—'}
                 </td>
@@ -108,9 +132,25 @@ export function EndpointsTable({
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-slate-400">
-        {selected.size} / {endpoints.length} endpoints sélectionnés
-      </p>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+        <span>
+          <strong className="font-semibold text-slate-600">{selected.size}</strong> /{' '}
+          {endpoints.length} endpoints sélectionnés
+          {visibleSelected !== selected.size && filtered.length !== endpoints.length && (
+            <span className="ml-1">({visibleSelected} visibles)</span>
+          )}
+        </span>
+        {query && (
+          <button
+            type="button"
+            className="btn-ghost !px-2 !py-1 text-xs"
+            onClick={() => setQuery('')}
+          >
+            Réinitialiser le filtre
+          </button>
+        )}
+      </div>
     </div>
   );
 }
