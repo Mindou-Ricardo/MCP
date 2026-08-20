@@ -1,0 +1,32 @@
+# Override de développement (appliqué automatiquement par `docker compose up`) :
+# hot reload backend + dev server Vite pour le frontend.
+services:
+  backend:
+    build:
+      context: ./backend
+      target: runtime
+    command: uvicorn mcpgen.api.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      - PYTHONPATH=/app/src
+      - DEBUG=true
+    volumes:
+      - ./backend/src:/app/src
+    # Le volume nommé `generated_servers` de la base est conservé.
+
+  frontend:
+    build:
+      context: ./frontend
+      target: build
+    command: npm run dev -- --host 0.0.0.0
+    environment:
+      - VITE_API_PROXY_TARGET=http://backend:8000
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tailwind.config.ts:/app/tailwind.config.ts
+      - ./frontend/postcss.config.js:/app/postcss.config.js
+    ports:
+      - "5173:5173"
+    healthcheck:
+      disable: true

@@ -1,0 +1,122 @@
+"""Tools MCP générés — exécutent les appels HTTP vers l'API cible.
+
+Fichier généré automatiquement. Ne pas modifier à la main.
+"""
+
+from __future__ import annotations
+
+import base64
+import json
+import os
+from typing import Any
+
+import httpx
+
+CONFIG: dict[str, Any] = {{ config_json }}
+
+TOOLS: list[dict[str, Any]] = [
+{% for tool in tools %}
+    {
+        "name": {{ tool.name | tojson }},
+        "description": {{ tool.description | tojson }},
+        "input_schema": {{ tool.input_schema | tojson }},
+        "method": {{ tool.method | tojson }},
+        "path": {{ tool.path | tojson }},
+        "path_params": {{ tool.path_params | tojson }},
+        "query_params": {{ tool.query_params | tojson }},
+        "header_params": {{ tool.header_params | tojson }},
+        "has_body": {{ tool.has_body | tojson }},
+    }{{ "," if not loop.last else "" }}
+{% endfor %}
+]
+
+_MAX_BODY_CHARS = 200_000
+
+
+async def _request_headers() -> dict[str, str]:
+    """Construit les headers d'authentification depuis la configuration."""
+    headers: dict[str, str] = {"Accept": "application/json"}
+    auth = CONFIG.get("auth", {}) or {}
+    auth_type = auth.get("type", "none")
+
+    if auth_type == "api_key":
+        header_name = auth.get("header_name") or "X-API-Key"
+        key = os.environ.get("MCP_SERVER_API_KEY") or auth.get("api_key") or ""
+        if key:
+            headers[header_name] = key
+    elif auth_type == "bearer":
+        key = os.environ.get("MCP_SERVER_API_KEY") or auth.get("api_key") or ""
+        if key:
+            headers["Authorization"] = f"Bearer {key}"
+    elif auth_type == "basic":
+        username = auth.get("username", "")
+        password = auth.get("password", "")
+        token = base64.b64encode(f"{username}:{password}".encode()).decode()
+        headers["Authorization"] = f"Basic {token}"
+
+    return headers
+
+
+def _build_url(tool: dict[str, Any], arguments: dict[str, Any]) -> str:
+    """Construit l'URL finale en substituant les paramètres de chemin."""
+    url = CONFIG["base_url"].rstrip("/") + tool["path"]
+    for key in tool.get("path_params", []):
+        url = url.replace("{" + key + "}", str(arguments.get(key, "")))
+    return url
+
+
+def _truncate(text: str, limit: int = _MAX_BODY_CHARS) -> str:
+    return text if len(text) <= limit else text[:limit] + "…(tronqué)"
+
+
+async def execute_tool(name: str, arguments: dict[str, Any]) -> str:
+    """Exécute un tool : appel HTTP réel vers l'API cible. Retourne du JSON."""
+    tool = next((t for t in TOOLS if t["name"] == name), None)
+    if tool is None:
+        return json.dumps({"error": f"Tool inconnu : {name}"}, ensure_ascii=False)
+
+    url = _build_url(tool, arguments)
+    query = {key: arguments[key] for key in tool.get("query_params", []) if key in arguments}
+
+    headers = await _request_headers()
+    for key in tool.get("header_params", []):
+        if key in arguments:
+            headers[key] = str(arguments[key])
+
+    content: str | None = None
+    if tool.get("has_body") and "body" in arguments:
+        content = json.dumps(arguments["body"], ensure_ascii=False)
+        headers["Content-Type"] = "application/json"
+
+    timeout = float(CONFIG.get("timeout", 30.0))
+    retries = int(CONFIG.get("retries", 1))
+    last_error: str | None = None
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        for attempt in range(retries + 1):
+            try:
+                response = await client.request(
+                    tool["method"],
+                    url,
+                    params=query,
+                    headers=headers,
+                    content=content,
+                )
+                raw = response.text
+                try:
+                    payload: Any = response.json()
+                except ValueError:
+                    payload = {"text": _truncate(raw)}
+                return json.dumps(
+                    {"status_code": response.status_code, "data": payload},
+                    ensure_ascii=False,
+                )
+            except httpx.HTTPError as exc:
+                last_error = str(exc)
+                if attempt < retries:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+
+    return json.dumps(
+        {"error": f"Échec de l'appel HTTP après {retries + 1} tentative(s) : {last_error}"},
+        ensure_ascii=False,
+    )

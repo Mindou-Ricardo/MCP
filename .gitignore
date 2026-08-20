@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.db
+*.sqlite3
+
+# Node
+node_modules/
+frontend/dist/
+frontend/build/
+*.tsbuildinfo
+
+# Environnement & secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Serveurs MCP générés
+backend/generated-servers/*
+!backend/generated-servers/.gitkeep
+
+# Divers
+.DS_Store
+*.log
+coverage/
+htmlcov/
+.idea/
+.vscode/

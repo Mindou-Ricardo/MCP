@@ -1,0 +1,47 @@
+# {{ server_name }} — Serveur MCP généré
+
+Serveur MCP généré automatiquement depuis une spécification OpenAPI.
+Il expose {{ tools | length }} tool(s), chacun correspondant à un endpoint HTTP de l'API cible.
+
+## Démarrage rapide
+
+### Transport STDIO (défaut — Claude Desktop, clients MCP locaux)
+
+```bash
+python server.py
+```
+
+### Transport HTTP (Streamable HTTP)
+
+```bash
+python server.py --transport http --port 8000
+```
+
+L'API MCP est alors disponible sur `POST /mcp` et le healthcheck sur `GET /health`.
+
+### Avec Docker
+
+```bash
+docker build -t {{ server_name }} .
+docker run -p 8000:8000 {{ server_name }}
+```
+
+## Configuration
+
+- `CONFIG` (dans `tools.py`) contient l'URL cible, l'auth, le timeout et les retries.
+- Clé API : définir la variable d'environnement `MCP_SERVER_API_KEY` pour ne pas dépendre
+  de la clé embarquée dans `tools.py` (recommandé en production).
+
+## Endpoints exposés
+
+{% for tool in tools %}
+- `{{ tool.name }}` : {{ tool.method }} {{ tool.path }}
+{% endfor %}
+
+## Tests rapides
+
+Client MCP officiel :
+
+```bash
+npx @modelcontextprotocol/inspector python server.py
+```

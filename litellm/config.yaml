@@ -1,0 +1,42 @@
+# Configuration LiteLLM proxy
+# Provider par défaut : Mistral. Changer de provider = éditer ce fichier uniquement.
+# Clé : MISTRAL_API_KEY (via .env), jamais en dur.
+
+model_list:
+  - model_name: mistral/mistral-large-latest
+    litellm_params:
+      model: mistral/mistral-large-latest
+      api_key: os.environ/MISTRAL_API_KEY
+  - model_name: mistral/mistral-medium
+    litellm_params:
+      model: mistral/mistral-medium
+      api_key: os.environ/MISTRAL_API_KEY
+  - model_name: mistral/mistral-small
+    litellm_params:
+      model: mistral/mistral-small
+      api_key: os.environ/MISTRAL_API_KEY
+
+  # Providers additionnels (extensibilité sans toucher au code métier)
+  - model_name: openai/gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: anthropic/claude-3-5-sonnet-latest
+    litellm_params:
+      model: anthropic/claude-3-5-sonnet-latest
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: ollama/llama3.1
+    litellm_params:
+      model: ollama/llama3.1
+      api_base: os.environ/OLLAMA_API_BASE
+
+litellm_settings:
+  drop_params: true
+  num_retries: 2
+  request_timeout: 120
+  set_verbose: false
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: ""
+  allowed_ips: []

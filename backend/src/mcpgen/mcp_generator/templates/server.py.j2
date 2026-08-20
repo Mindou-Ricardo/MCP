@@ -1,0 +1,93 @@
+"""Serveur MCP généré automatiquement — {{ server_name }}.
+
+Transports supportés :
+  - STDIO (défaut, pour intégration Claude Desktop / MCP clients locaux)
+  - Streamable HTTP (POST /mcp, GET /health)
+
+Documentation : voir README.md
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import os
+
+from mcp.server import Server
+from mcp.server.stdio import stdio_server
+from mcp.types import TextContent, Tool
+
+from tools import TOOLS, execute_tool
+
+server = Server("{{ server_name }}")
+
+
+@server.list_tools()
+async def list_tools() -> list[Tool]:
+    """Enregistre les tools générés auprès du client MCP."""
+    return [
+        Tool(
+            name=tool["name"],
+            description=tool["description"],
+            inputSchema=tool["input_schema"],
+        )
+        for tool in TOOLS
+    ]
+
+
+@server.call_tool()
+async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+    """Exécute un tool : appel HTTP réel vers l'API cible."""
+    result_text = await execute_tool(name, arguments)
+    return [TextContent(type="text", text=result_text)]
+
+
+async def run_stdio() -> None:
+    """Transport STDIO : lecture/écriture sur stdin/stdout."""
+    async with stdio_server() as (read_stream, write_stream):
+        await server.run(
+            read_stream, write_stream, server.create_initialization_options()
+        )
+
+
+def create_http_app():
+    """Application Starlette exposant le serveur MCP en Streamable HTTP."""
+    from mcp.server.streamable_http import StreamableHTTPSessionManager
+    from starlette.applications import Starlette
+    from starlette.requests import Request
+    from starlette.responses import JSONResponse
+    from starlette.routing import Route
+
+    manager = StreamableHTTPSessionManager(server=server)
+
+    async def mcp_endpoint(request: Request):
+        return await manager.handle_request(request)
+
+    async def health(_: Request) -> JSONResponse:
+        return JSONResponse({"status": "ok", "server": "{{ server_name }}", "tools": len(TOOLS)})
+
+    return Starlette(routes=[Route("/mcp", mcp_endpoint, methods=["POST"]), Route("/health", health, methods=["GET"])])
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Serveur MCP généré depuis une spec OpenAPI")
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "http"],
+        default=os.environ.get("MCP_TRANSPORT", "stdio"),
+        help="Transport du serveur MCP (défaut : stdio)",
+    )
+    parser.add_argument("--port", type=int, default=int(os.environ.get("MCP_PORT", "8000")))
+    args = parser.parse_args()
+
+    if args.transport == "http":
+        import uvicorn
+
+        uvicorn.run(create_http_app(), host="0.0.0.0", port=args.port)
+    else:
+        asyncio.run(run_stdio())
+
+
+if __name__ == "__main__":
+    main()
