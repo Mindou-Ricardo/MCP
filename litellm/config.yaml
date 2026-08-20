@@ -38,4 +38,3 @@ litellm_settings:
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
-  allowed_ips: []
